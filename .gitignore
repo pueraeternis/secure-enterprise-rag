@@ -32,3 +32,9 @@ env/
 
 # Local configs
 *.log
+
+# Milvus
+deploy/milvus
+
+# Open Web UI
+deploy/open-webui-data

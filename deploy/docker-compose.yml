@@ -1,0 +1,166 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. ORCHESTRATION LAYER (FastAPI)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: rag_backend
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
+      - VLLM_API_BASE=http://vllm:8000/v1
+      - VLLM_API_KEY=${VLLM_API_KEY}
+    ports:
+      - "${API_PORT}:8000"
+    depends_on:
+      milvus-standalone:
+        condition: service_healthy 
+      vllm:
+        condition: service_healthy
+    networks:
+      - rag-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # 2. INFERENCE LAYER (vLLM)
+  # ---------------------------------------------------------------------------
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm_server
+    runtime: nvidia
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ports:
+      - "8001:8000"
+    ipc: host
+    command: >
+      --model ${MODEL_NAME}
+      --api-key ${VLLM_API_KEY}
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION}
+      --max-model-len ${MAX_MODEL_LEN}
+      --dtype ${DTYPE}
+      --trust-remote-code
+      --enforce-eager
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+    networks:
+      - rag-net
+
+  # ---------------------------------------------------------------------------
+  # 3. DATA LAYER (Milvus 2.6.7 Official + Dependencies)
+  # ---------------------------------------------------------------------------
+  milvus-etcd:
+    container_name: milvus_etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./milvus/volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://milvus-etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - rag-net
+
+  milvus-minio:
+    container_name: milvus_minio
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ./milvus/volumes/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - rag-net
+
+  milvus-standalone:
+    container_name: milvus_standalone
+    image: milvusdb/milvus:${MILVUS_VERSION}
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      MINIO_ADDRESS: milvus-minio:9000
+      MQ_TYPE: woodpecker
+    volumes:
+      - ./milvus/volumes/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - milvus-etcd
+      - milvus-minio
+    networks:
+      - rag-net
+
+  # Attu (GUI)
+  attu:
+    image: zilliz/attu:latest
+    container_name: milvus_attu
+    environment:
+      MILVUS_URL: milvus-standalone:19530
+    ports:
+      - "${ATTU_PORT:-8080}:3000"
+    depends_on:
+      - milvus-standalone
+    networks:
+      - rag-net
+
+  # ---------------------------------------------------------------------------
+  # 4. CLIENT LAYER (Open Web UI)
+  # ---------------------------------------------------------------------------
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.6.32
+    container_name: open_webui
+    volumes:
+      - ./open-webui-data:/app/backend/data
+    environment:
+      - OPENAI_API_BASE_URL=http://backend:8000/api/v1
+      - OPENAI_API_KEY=sk-internal-rag-key
+    ports:
+      - "${WEBUI_PORT}:8080"
+    depends_on:
+      - backend
+    networks:
+      - rag-net
+    restart: unless-stopped
+
+networks:
+  rag-net:
+    driver: bridge
