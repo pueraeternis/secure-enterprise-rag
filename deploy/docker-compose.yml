@@ -17,6 +17,7 @@ services:
       - MILVUS_PORT=19530
       - VLLM_API_BASE=http://vllm:8000/v1
       - VLLM_API_KEY=${VLLM_API_KEY}
+      - VLLM_MODEL_NAME=${MODEL_NAME}
     ports:
       - "${API_PORT}:8000"
     depends_on:

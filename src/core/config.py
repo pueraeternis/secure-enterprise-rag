@@ -19,8 +19,11 @@ class Settings(BaseSettings):
 
     # vLLM Config
     VLLM_API_BASE: str = "http://vllm:8000/v1"
-    VLLM_MODEL_NAME: str = "google/gemma-2-27b-it"
+    VLLM_MODEL_NAME: str = "google/gemma-3-27b-it"
     VLLM_API_KEY: str = "secure-llm-key"
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(env_file=".env", env_ignore_empty=True)
 
