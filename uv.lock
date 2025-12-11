@@ -3317,6 +3317,8 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pymilvus" },
     { name = "python-multipart" },
+    { name = "sentence-transformers" },
+    { name = "torch" },
     { name = "unstructured", extra = ["pdf"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -3342,6 +3344,8 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "pymilvus", specifier = ">=2.6.5" },
     { name = "python-multipart", specifier = ">=0.0.20" },
+    { name = "sentence-transformers", specifier = ">=5.1.2" },
+    { name = "torch", specifier = ">=2.9.1" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.21" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.38.0" },
 ]

@@ -7,6 +7,11 @@ services:
       context: ..
       dockerfile: Dockerfile
     container_name: rag_backend
+    user: root
+    volumes:
+      - ../src:/app/src  
+      - ~/.cache/huggingface:/root/.cache/huggingface 
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
     environment:
       - MILVUS_HOST=milvus-standalone
       - MILVUS_PORT=19530
@@ -16,7 +21,7 @@ services:
       - "${API_PORT}:8000"
     depends_on:
       milvus-standalone:
-        condition: service_healthy 
+        condition: service_healthy
       vllm:
         condition: service_healthy
     networks:
