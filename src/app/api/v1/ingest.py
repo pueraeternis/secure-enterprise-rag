@@ -5,33 +5,14 @@ from tempfile import NamedTemporaryFile
 from typing import Annotated
 
 import aiofiles
-import pypdf
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import BaseModel
 
+from src.app.schemas.ingest import IngestResponse
+from src.infrastructure.parsers.pdf import parse_pdf_sync
 from src.services.ingestion import ingestion_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-class IngestResponse(BaseModel):
-    filename: str
-    status: str
-    chunks_count: int
-
-
-def _parse_pdf_sync(file_path: Path) -> str:
-    """
-    Run in a separate thread to avoid blocking the event loop.
-    """
-    try:
-        reader = pypdf.PdfReader(str(file_path))
-        text_content = [text for page in reader.pages if (text := page.extract_text())]
-        return "\n".join(text_content)
-    except Exception as e:
-        logger.error("Failed to parse PDF %s: %s", file_path, e)
-        raise ValueError(f"Failed to parse PDF file: {e}") from e
 
 
 @router.post("/ingest/file")
@@ -43,10 +24,7 @@ async def ingest_file(
     """
     filename = Path(file.filename or "unknown")
     if filename.suffix.lower() not in (".pdf", ".txt", ".md"):
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF, TXT, MD files supported",
-        )
+        raise HTTPException(status_code=400, detail="Only PDF, TXT, MD files supported")
 
     with NamedTemporaryFile(delete=False, suffix=filename.suffix) as temp_file:
         temp_path = Path(temp_file.name)
@@ -63,7 +41,7 @@ async def ingest_file(
             try:
                 text_content = await loop.run_in_executor(
                     None,
-                    _parse_pdf_sync,
+                    parse_pdf_sync,
                     temp_path,
                 )
             except ValueError as e:
@@ -73,10 +51,7 @@ async def ingest_file(
                 text_content = await f.read()
 
         if not text_content.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="File is empty or text could not be extracted",
-            )
+            raise HTTPException(status_code=400, detail="File is empty")
 
         doc = await ingestion_service.ingest_text(file.filename, text_content)
 
@@ -90,10 +65,7 @@ async def ingest_file(
         logger.exception("Error during file ingestion")
         if isinstance(e, HTTPException):
             raise
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal processing error: {e!s}",
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Error: {e!s}") from e
 
     finally:
         if temp_path.exists():

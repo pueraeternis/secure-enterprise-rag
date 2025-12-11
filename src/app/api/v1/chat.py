@@ -4,53 +4,20 @@ from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
+from src.app.schemas.chat import ChatRequest, ModelCard, ModelList
 from src.services.rag_service import rag_service
 
 router = APIRouter()
 
 
-class Message(BaseModel):
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    messages: list[Message]
-    model: str | None = None
-    stream: bool = True
-
-
-class ModelCard(BaseModel):
-    id: str
-    object: str = "model"
-    created: int = 1677610602
-    owned_by: str = "openai"
-
-
-class ModelList(BaseModel):
-    object: str = "list"
-    data: list[ModelCard]
-
-
 @router.get("/models")
 async def list_models() -> ModelList:
-    """
-    List models.
-    """
-    return ModelList(
-        data=[
-            ModelCard(id="secure-rag", owned_by="enterprise"),
-        ],
-    )
+    return ModelList(data=[ModelCard(id="secure-rag", owned_by="enterprise")])
 
 
 @router.post("/chat/completions")
 async def chat_completions(request: ChatRequest) -> StreamingResponse:
-    """
-    OpenAI-compatible endpoint for RAG.
-    """
     if not request.messages:
         raise HTTPException(status_code=400, detail="No messages provided")
 
@@ -74,10 +41,6 @@ async def chat_completions(request: ChatRequest) -> StreamingResponse:
                 ],
             }
             yield f"data: {json.dumps(chunk_data)}\n\n"
-
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(
-        openai_stream_generator(),
-        media_type="text/event-stream",
-    )
+    return StreamingResponse(openai_stream_generator(), media_type="text/event-stream")
