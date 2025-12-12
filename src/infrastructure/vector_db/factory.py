@@ -13,7 +13,9 @@ def get_embedding_model() -> HuggingFaceEmbedding:
     Load the BGE-M3 embedding model into memory (CPU).
     Singleton: loaded once at startup.
     """
-    print(f"⏳ Loading Embedding Model: {settings.EMBEDDING_MODEL_NAME} on {settings.EMBEDDING_DEVICE}...")
+    print(
+        f"⏳ Loading Embedding Model: {settings.EMBEDDING_MODEL_NAME} on {settings.EMBEDDING_DEVICE}...",
+    )
     embed_model = HuggingFaceEmbedding(
         model_name=settings.EMBEDDING_MODEL_NAME,
         device=settings.EMBEDDING_DEVICE,

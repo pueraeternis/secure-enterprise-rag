@@ -20,7 +20,10 @@ def test_parse_pdf_sync_success() -> None:
 
     mock_reader.pages = [page1, page2, page3]
 
-    with patch("src.infrastructure.parsers.pdf.pypdf.PdfReader", return_value=mock_reader):
+    with patch(
+        "src.infrastructure.parsers.pdf.pypdf.PdfReader",
+        return_value=mock_reader,
+    ):
         result = parse_pdf_sync(Path("dummy.pdf"))
 
     assert result == "Hello\nWorld"
@@ -28,7 +31,10 @@ def test_parse_pdf_sync_success() -> None:
 
 def test_parse_pdf_sync_error() -> None:
     with (
-        patch("src.infrastructure.parsers.pdf.pypdf.PdfReader", side_effect=Exception("Corrupted file")),
+        patch(
+            "src.infrastructure.parsers.pdf.pypdf.PdfReader",
+            side_effect=Exception("Corrupted file"),
+        ),
         pytest.raises(ValueError, match="Failed to parse PDF file"),
     ):
         parse_pdf_sync(Path("bad.pdf"))

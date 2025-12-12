@@ -28,7 +28,9 @@ class VLLMClient:
                     yield chunk.choices[0].delta.content
 
         except Exception as e:
-            yield (f"\n[System Error: Could not connect to LLM Engine at {settings.VLLM_API_BASE}. Details: {e!s}]")
+            yield (
+                f"\n[System Error: Could not connect to LLM Engine at {settings.VLLM_API_BASE}. Details: {e!s}]"
+            )
 
 
 vllm_client = VLLMClient()
